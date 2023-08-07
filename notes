@@ -1,0 +1,6 @@
+#1 Missing permissions for channel creation and threads (done)
+#2 running setup multiple times gives multiple channels limit it to 1
+#534992251984
+#https://discord.com/api/oauth2/authorize?client_id=1133119697194319962&permissions= 534992251984&scope=bot
+
+
