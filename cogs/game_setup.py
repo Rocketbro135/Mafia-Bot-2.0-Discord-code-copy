@@ -2,12 +2,18 @@ import discord
 from discord.ext import commands
 
 from cogs.initialization import Join
-class GameSetup(commands.Cog):
 
+class GameSetup(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.setups_done = {}
         self.player_list = dict(zip(Join.players[0], Join.players[1]))
+
+    async def create_mafia_game_channel(self, ctx):
+        mafia_game_channel = await ctx.guild.create_text_channel('Ultimate_Mafia')
+        mafia_role_thread = await mafia_game_channel.create_thread(name='Mafias', type=discord.ChannelType.private_thread)
+        spectator_thread = await mafia_game_channel.create_thread(name='Spectators', type=discord.ChannelType.private_thread)
+        return {'mafia_role_thread': mafia_role_thread, 'spectator_thread': spectator_thread}
 
     class SpectatorButton(discord.ui.Button['SpectatorView']):
         def __init__(self, spectator_role: discord.Role):
@@ -16,11 +22,16 @@ class GameSetup(commands.Cog):
 
         async def callback(self, interaction: discord.Interaction):
             member = interaction.user
-            if self.spectator_role in member.roles or self.view.cog.player_list.get(member) != True:
-                await interaction.response.send_message('You are already a spectator or not a player!', ephemeral=True)
+            if self.spectator_role in member.roles:
+                await interaction.response.send_message('You are already a spectator!', ephemeral=True)
+            elif self.view.cog.player_list.get(member): 
+                await interaction.response.send_message('You are already participating in the game as a player!', ephemeral=True)
             else:
-                await member.add_roles(self.spectator_role)
-                await interaction.response.send_message('You are now a spectator!', ephemeral=True)
+                try:
+                    await member.add_roles(self.spectator_role)
+                    await interaction.response.send_message('You are now a spectator!', ephemeral=True)
+                except Exception as e:
+                    await interaction.response.send_message(f'An error occured: {str(e)}', ephemeral=True)
 
     class SpectatorView(discord.ui.View):
         def __init__(self, spectator_role: discord.Role, cog):
@@ -32,14 +43,14 @@ class GameSetup(commands.Cog):
     async def setup(self, ctx):
         guild = ctx.guild
         spectator_role = discord.utils.get(guild.roles, name="spectator")
-        # assuming the role exists in guild 
-        mafia_game_channel = await guild.create_text_channel('Mafia 2.0')
-        mafia_role_thread = await mafia_game_channel.create_thread(name='Mafias', type=discord.ChannelType.private_thread)
-        spectator_thread = await mafia_game_channel.create_thread(name='Spectators', type=discord.ChannelType.private_thread)
+        threads = await self.create_mafia_game_channel(ctx)
+        mafia_role_thread = threads['mafia_role_thread']
+        spectator_thread = threads['spectator_thread']
 
         self.setups_done[guild.id] = {'spectator_thread': spectator_thread, 'spectator_role': spectator_role}
-
-        #await spectator_thread.send("Press the button to join as spectator!", view=self.SpectatorView(spectator_role, self)) 
+        print(self.setups_done)
+        # assuming the spectator role exists in guild 
+        await ctx.send("Press the button to join as spectator!", view=self.SpectatorView(spectator_role, self)) 
         # move the above to the future /start command as I want the spectator button shown then and as a ctx.send
     
     @commands.hybrid_command(name="spectator", description="Assigns spectator so you can watch Mafia 2.0 Games!")
