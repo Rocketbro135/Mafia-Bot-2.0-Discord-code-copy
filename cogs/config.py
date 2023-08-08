@@ -6,6 +6,7 @@ from discord.ext import commands
 import cogs.Command_Settings.bot_settings as bot_settings
 
 import cogs.embeds.File_embeds.embeds as File_embeds
+import cogs.Command_Settings.bot_settings as Command_Settings
 
 class Gamemodes(commands.Cog):
     # _instance = None possibly enable back if code breaks
@@ -84,11 +85,11 @@ class Gamemodes(commands.Cog):
         seconds = self.get_seconds()
         return discord.app_commands.Choice(name="seconds", value=seconds)
 
-    async def category_autocomplete(
-    self,
-    ctx,
-    current: str,
-    ) -> discord.app_commands.Choice[str]:
+    # async def category_autocomplete(
+    # self,
+    # ctx,
+    # current: str,
+    # ) -> discord.app_commands.Choice[str]:
         
     
 
@@ -203,12 +204,25 @@ class Gamemodes(commands.Cog):
             return seconds
 
     @commands.hybrid_command(name="category", description = "Set the category that the bot creates the text channel in!") 
-    @discord.app_commands.autocomplete()
     async def set_channel(self, ctx, category: discord.CategoryChannel):
+        if not hasattr(self.bot, 'category_channels'):
+            self.bot.category_channels = {}
+        
+        self.bot.category_channels[ctx.guild.id] = category.id
+        # category_id = self.bot.category_channels.get(guild.id, None) In order to access it in other channels use the following
+        setup_game_embed = discord.Embed(
+            title="Mafiabot 2.0",
+            description=f"Got it. I will now create text channels at #{category} from now on.",
+            color=discord.Colour.red()
+        )
+        
+        setup_game_embed.set_thumbnail(url=Command_Settings.bot_image_thumbnail_url)        
+        await ctx.send(embed=setup_game_embed)
 
+#spectator_roles = self.bot.spectator_roles
+#print(spectator_roles)
 
 async def setup(bot):
     cog = Gamemodes(bot)
     await bot.add_cog(cog)
-
-
+    
