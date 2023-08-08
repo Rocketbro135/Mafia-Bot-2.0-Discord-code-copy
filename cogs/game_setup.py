@@ -14,6 +14,14 @@ class GameSetup(commands.Cog):
         mafia_role_thread = await mafia_game_channel.create_thread(name='Mafias', type=discord.ChannelType.private_thread)
         spectator_thread = await mafia_game_channel.create_thread(name='Spectators', type=discord.ChannelType.private_thread)
         return {'mafia_role_thread': mafia_role_thread, 'spectator_thread': spectator_thread}
+    
+    async def get_or_create_role(self, guild, role_name):
+        #Helper function to get a role by name or create it if it doesn't exist
+        role = discord.utils.get(guild.roles, name=role_name)
+        if not role:
+            permissions = discord.Permissions(send_messages=True, read_messages=True)  # Example: Adjust as needed
+            role = await guild.create_role(name=role_name, permissions=permissions)
+        return role
 
     class SpectatorButton(discord.ui.Button['SpectatorView']):
         def __init__(self, spectator_role: discord.Role):
@@ -42,12 +50,16 @@ class GameSetup(commands.Cog):
     @commands.hybrid_command(name="setup", description = "bot dev - temp for checking if channel creation works")
     async def setup(self, ctx):
         guild = ctx.guild
-        spectator_role = discord.utils.get(guild.roles, name="spectator")
+        role_name = "Mafia spectator"
+        spectator_role = await self.get_or_create_role(guild, role_name)
         threads = await self.create_mafia_game_channel(ctx)
+        self.bot.spectator_roles = {}    # Initialize the dictionary
+        self.bot.spectator_roles[guild.id] = spectator_role
         mafia_role_thread = threads['mafia_role_thread']
         spectator_thread = threads['spectator_thread']
 
         self.setups_done[guild.id] = {'spectator_thread': spectator_thread, 'spectator_role': spectator_role}
+        print(spectator_role) # prints out Mafia spectator
         print(self.setups_done)
         # assuming the spectator role exists in guild 
         await ctx.send("Press the button to join as spectator!", view=self.SpectatorView(spectator_role, self)) 
