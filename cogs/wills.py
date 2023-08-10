@@ -60,5 +60,6 @@ class will_generation(commands.Cog):
             await ctx.author.send("You have not written a will yet.")
 
 
-def setup(bot):
-    bot.add_cog(will_generation(bot))
+async def setup(bot):
+    cog = will_generation(bot)
+    await bot.add_cog(cog)
