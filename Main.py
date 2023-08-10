@@ -24,6 +24,7 @@ class MyBot(commands.Bot):
         print("Bot is starting...")
         await self.load_extension('cogs.initialization')
         await self.load_extension('cogs.config')
+        await self.load_extension('cogs.wills')
         await self.load_extension('cogs.game_setup')
 
 bot = MyBot(command_prefix=bot.command_prefix, intents=bot.intents)
