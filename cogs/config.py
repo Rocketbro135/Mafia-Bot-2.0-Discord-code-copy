@@ -108,6 +108,7 @@ class Gamemodes(commands.Cog):
             await ctx.send(embed=File_embeds.invalidEmbed)
         elif gamemode in Gamemodes.Mafia_gamemodes():
             server_name = ctx.guild.name
+            server_id = ctx.guild.id
             successful_gamemode_set_embed = discord.Embed(
                 title=f"✅Got it. {server_name} game mode has been set to {gamemode}! Have fun!",
                 color=discord.Color.green()
@@ -115,11 +116,12 @@ class Gamemodes(commands.Cog):
             # set the current gamemode here
             Gamemodes.current_gamemode = gamemode
 
+
             # be sure to add the following when a game is ongoing "You cannot change settings when a game is going on!"
             await ctx.send(embed=successful_gamemode_set_embed)
             return Gamemodes.current_gamemode
     
-    @commands.hybrid_command(name='gamemode', description = 'See all possible games mode that you can play!', with_slash_command=True)
+    @config.command(name='gamemode', description = 'See all possible games mode that you can play!', with_slash_command=True)
     async def view_gamemodes(self, ctx):
         # Sets the current gamemode in the footer
         if(Gamemodes.current_gamemode == None):
@@ -129,7 +131,7 @@ class Gamemodes(commands.Cog):
 
         await ctx.send(embed=File_embeds.avaliableGamemodes_Embed)
 
-    @commands.hybrid_command(name="showdeadrole", description = "Toggle the showdeadrole setting! Decides whether a person's role is revealed after they die!")
+    @config.command(name="showdeadrole", description = "Toggle the showdeadrole setting! Decides whether a person's role is revealed after they die!")
     async def show_dead_role(self, ctx): # organize this later the database structure needs to be completed first
         server_id = ctx.guild.id
         dead_role_setting = bot_settings.dead_role_setting
@@ -142,7 +144,7 @@ class Gamemodes(commands.Cog):
             await ctx.send(embed=File_embeds.enable_dead_role)
         return dead_role_setting
     
-    @commands.hybrid_command(name="dmtime", description = "The duration that the bots wait for your DM response at night!")
+    @config.command(name="dmtime", description = "The duration that the bots wait for your DM response at night!")
     @discord.app_commands.autocomplete(seconds=seconds_autocomplete)
     async def set_dm_time(self, ctx, seconds: int):
         Gamemodes.set_seconds(self.bot,seconds)
@@ -176,7 +178,7 @@ class Gamemodes(commands.Cog):
             await ctx.send(embed=dm_time_embed_equal)
             return seconds
 
-    @commands.hybrid_command(name="talktime", description = "The duration for players to discuss during the day!")
+    @config.command(name="talktime", description = "The duration for players to discuss during the day!")
     @discord.app_commands.autocomplete(seconds=talktime_seconds_autocomplete)
     async def set_talk_time(self, ctx, seconds: int):
         Gamemodes.set_talktime_seconds(self.bot,seconds)
@@ -203,7 +205,7 @@ class Gamemodes(commands.Cog):
             await ctx.send(embed=talk_time_embed_equal)
             return seconds
 
-    @commands.hybrid_command(name="category", description = "Set the category that the bot creates the text channel in!") 
+    @config.command(name="category", description = "Set the category that the bot creates the text channel in!") 
     async def set_channel(self, ctx, category: discord.CategoryChannel):
         if not hasattr(self.bot, 'category_channels'):
             self.bot.category_channels = {}
@@ -225,4 +227,3 @@ class Gamemodes(commands.Cog):
 async def setup(bot):
     cog = Gamemodes(bot)
     await bot.add_cog(cog)
-    
