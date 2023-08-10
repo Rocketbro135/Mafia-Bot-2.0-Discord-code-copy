@@ -6,6 +6,9 @@ import discord.colour
 from cogs.Command_Settings.bot_settings import version, maxPartySize
 from cogs.config import Gamemodes
 import cogs.embeds.Villager.Villager
+import cogs.embeds.Mafia.Reaper
+import cogs.embeds.File_embeds.embeds as File_embeds
+
 
 def get_current_gamemode(bot):
     cog = bot.get_cog('Gamemodes')
@@ -25,60 +28,36 @@ class Join(commands.Cog):
     @commands.hybrid_command(name='join', description = 'Joins the party in the server!')
     async def Join_Command(self, ctx):
         if len(Join.players[0]) == maxPartySize:
-            embed = discord.Embed(
-                title="",
-                description="The max amount of players is reached! Type /queue to see the queue.",
-                color=discord.colour.parse_hex_number('FF0000')
-            )
-
-            embed.set_author(
-                name="Mafiabot 2.0",
-                icon_url= "https://cdn.wanderer.moe/honkai-star-rail/splash-art/yanqing-full.png"
-            )
-
             # Adds the user's id into the join_queue list (later converts it to mention format)
             Join.join_queue.append(ctx.author.id)
-            await ctx.send(embed=embed)
+            await ctx.send(embed=File_embeds.max_players_reached)
 
         else:
             # if the party is not full add user to the party
             Join.players[0].append(ctx.author.name)
             Join.players[1].append(ctx.author.id)
 
-            embed = discord.Embed(
+            joined_party_message = discord.Embed(
                 title=ctx.author.name + " has joined the party.",
                 description = "🥳Party Size: `" + str(len(Join.players[0])) + "`" + "\n🎲Current Mode: ",
                 color=discord.colour.parse_hex_number('00FF00')
             )
-            embed.add_field(
+            joined_party_message.add_field(
                 name="",
                 value=""
             )
-
-            embed.set_footer(
+            joined_party_message.set_footer(
                 text="Current Patch: " + version + "\nType /party to see who's in the party!"
             )
-
-            await ctx.send(embed=embed)
+            joined_party_message.set_thumbnail(url=ctx.author.avatar.url)
+            await ctx.send(embed=joined_party_message)
 
     # Put leave command here
     @commands.hybrid_command(name="leave", description = "leave the mafia party...")
     async def Leave_Command(self, ctx):
 
         if(ctx.author.name not in Join.players[0]):
-            embed = discord.Embed(
-                title="",
-                description="",
-                color=discord.Color.red()
-            )
-            embed.add_field(
-                name="",
-                value="You are not in the party lol😅",
-                inline=True
-            )
-            embed.set_author(name="Mafiabot 2.0")
-
-            await ctx.send(embed=embed)
+            await ctx.send(embed=File_embeds.not_in_party_embed)
             
         elif(ctx.author.name in Join.players[0]): # if game has not started leave the party
             Join.players[0].remove(ctx.author.name)
@@ -216,10 +195,32 @@ class Join(commands.Cog):
 
     @commands.hybrid_command(name="embedtester", description = "bot dev - temp for checking if embeds work")
     async def embedTester(self, ctx):
-        await ctx.send(embed = cogs.embeds.Villager.Villager.villager_role)
+        await ctx.send(embed = cogs.embeds.Mafia.Reaper.reaper_role)
 
-    
+    @commands.hybrid_command(name="promote", description = "Promotes a member to party leader (Must be in party)")
+    async def promote_command(self, ctx, user: discord.Member):
+        # Check if Join.players[1] is not empty
+        if Join.players[1]:
+            # Check if the user to be promoted is already the party leader
+            if user.id == Join.players[1][0]:
+                await ctx.send(f"{user.display_name} is already the party leader.")
+            else:
+                # Check if the user to be promoted is in the party
+                if user.id in Join.players[1]:
+                    # Remove the user from the current position
+                    user_index = Join.players[1].index(user.id)
+                    Join.players[0].pop(user_index)
+                    Join.players[1].pop(user_index)
 
+                    # Put the user at the start of the list
+                    Join.players[0].insert(0, user.name)
+                    Join.players[1].insert(0, user.id)
+
+                    await ctx.send(f"{user.mention} has been promoted to party leader.")
+                else:
+                    await ctx.send("The user you are trying to promote is not in the party.")
+        else:
+            await ctx.send("The party is currently empty.")
 
 async def setup(bot):
     cog = Join(bot)
