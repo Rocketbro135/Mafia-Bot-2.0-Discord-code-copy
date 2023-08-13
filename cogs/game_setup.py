@@ -15,11 +15,46 @@ class GameSetup(commands.Cog):
         self.setups_done = {}
         self.player_list = dict(zip(Join.players[0], Join.players[1]))
 
-    async def create_mafia_game_channel(self, ctx):
-        mafia_game_channel = await ctx.guild.create_text_channel('Ultimate_Mafia')
+    async def create_mafia_game_channel(self, ctx, role_name, category_id):
+        guild = ctx.guild
+        join_cog = self.bot.get_cog('Join')
+        category = guild.get_channel(category_id)
+        spectator_role = await self.get_or_create_role(guild, role_name)
+
+        overwrites = {
+        guild.default_role: discord.PermissionOverwrite(read_messages=False, send_messages=False),
+        guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True) # guild.me is the bot itself
+        }
+
+        default_overwrites = {
+        guild.default_role: discord.PermissionOverwrite(read_messages=False, send_messages=False),
+        guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True) # guild.me is the bot itself
+        }
+
+        # Gets the players currently Joined and puts their id's in joined_player_ids
+        joined_player_ids = [guild.get_member(player_id) for player_id in join_cog.players[1] if guild.get_member(player_id) is not None]
+    
+        for joined_player in joined_player_ids:
+            overwrites[joined_player] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
+
+        # Creating the Game channel & Setting permissions for spectator role. Makes the Mafia_Team thread
+        # Threads share permissions with the parent channel; position 0 is the top of the category
+        mafia_game_channel = await category.create_text_channel(name='Ultimate_Mafia', overwrites=overwrites, position=0)
+        await mafia_game_channel.set_permissions(spectator_role, view_channel=True, send_messages=False)
         mafia_role_thread = await mafia_game_channel.create_thread(name='Mafias', type=discord.ChannelType.private_thread)
-        spectator_thread = await mafia_game_channel.create_thread(name='Spectators', type=discord.ChannelType.private_thread)
-        return {'mafia_role_thread': mafia_role_thread, 'spectator_thread': spectator_thread}
+
+        # Creating the Spectator channel & Setting permissions for spectator role.
+        spectator_channel = await category.create_text_channel(name='Spectators', overwrites=default_overwrites, position=1)
+        await spectator_channel.set_permissions(spectator_role, view_channel=True, send_messages=True)
+
+        print(mafia_role_thread)
+        print("---")
+        print(mafia_game_channel)
+        print("---")
+        print(spectator_role)
+
+        #spectator_thread = await mafia_game_channel.create_thread(name='Spectators', type=discord.ChannelType.private_thread)
+        return {'mafia_role_thread': mafia_role_thread, 'spectator_channel': spectator_channel}
     
     async def get_or_create_role(self, guild, role_name):
         # Helper function to get a role by name or create it if it doesn't exist
@@ -58,14 +93,31 @@ class GameSetup(commands.Cog):
         guild = ctx.guild
         role_name = "Mafia spectator"
         spectator_role = await self.get_or_create_role(guild, role_name)
-        threads = await self.create_mafia_game_channel(ctx)
+
+        # Tries to get the category channel from the bot's stored category_channels if not creates id at current location
+        try:
+            #self.bot.category_channels:
+            category_id = self.bot.category_channels.get(guild.id)
+        except:
+            category_id = ctx.channel.category_id
+        
+        print(category_id)
+        print("test")
+
+        # Create the channels in the specified category, or in the guild if no category is specified
+        if category_id:
+            threads = await self.create_mafia_game_channel(ctx, role_name, category_id)
+        else:
+            category_id = ctx.channel.category.id
+            threads = await self.create_mafia_game_channel(ctx, category_id)
+
         self.bot.spectator_roles = {}    # Initialize the dictionary
         self.bot.spectator_roles[guild.id] = spectator_role
         mafia_role_thread = threads['mafia_role_thread']
-        spectator_thread = threads['spectator_thread']
+        spectator_channel = threads['spectator_channel']
 
         self.setups_done[guild.id] = {
-            'spectator_thread': spectator_thread,
+            'spectator_channel': spectator_channel,
             'spectator_role': spectator_role,
             'mafia_role_thread': mafia_role_thread,
         }
@@ -95,12 +147,11 @@ class GameSetup(commands.Cog):
                     color=discord.Color.red()
                 )
 
-                await ctx.send(embed = start_game_embed_Success)
+                await ctx.send(embed = start_game_embed_Success) # make sure to add the other embed for starting the game
             else:
                 await ctx.send('You are not the party leader!')
         else:
             await ctx.send('Setup has not been run for this guild!')
-
 
     @commands.hybrid_command(name="spectator", description = "Assigns spectator so you can watch Mafia 2.0 Games!")
     async def become_spectator(self, ctx):
