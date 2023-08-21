@@ -26,6 +26,7 @@ class Gamemodes(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.current_gamemode: str | None
+        #self.seconds = None
         self.get_seconds = None
         #_instance = None # possibly enable back if code breaks
         #current_gamemode = Gamemodes.get_gamemode()
@@ -90,8 +91,6 @@ class Gamemodes(commands.Cog):
     # ctx,
     # current: str,
     # ) -> discord.app_commands.Choice[str]:
-        
-    
 
     # @classmethod
     # def get_gamemode(cls):
@@ -148,6 +147,7 @@ class Gamemodes(commands.Cog):
     @discord.app_commands.autocomplete(seconds=seconds_autocomplete)
     async def set_dm_time(self, ctx, seconds: int):
         Gamemodes.set_seconds(self.bot,seconds)
+        print(Gamemodes.get_seconds(self.bot))
         dm_time_embed_equal = discord.Embed(
             title="Mafiabot 2.0",
             description=f"Got it. dmtime is now {seconds} seconds",
@@ -220,6 +220,27 @@ class Gamemodes(commands.Cog):
         
         setup_game_embed.set_thumbnail(url=Command_Settings.bot_image_thumbnail_url)        
         await ctx.send(embed=setup_game_embed)
+
+    @commands.hybrid_command(name="setting", description = "Shows the current setting for this server!")
+    async def show_setting(self, ctx):
+        current_settings_embed = discord.Embed(
+            title=f"Current settings on {ctx.guild.name}",
+            description="Customizable settings for Mafiabot 2.0",
+            color=discord.Color.og_blurple()
+        )
+        current_settings_embed.add_field(
+            name="gamemode",
+            value=Gamemodes.current_gamemode,
+            inline=True
+        )
+        current_settings_embed.add_field(
+            name="dmtime",
+            value=Gamemodes.get_seconds(self.bot),
+            inline=True
+        )
+
+        await ctx.send("working on the command now")
+        await ctx.send(embed=current_settings_embed)
 
 #spectator_roles = self.bot.spectator_roles
 #print(spectator_roles)
