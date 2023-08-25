@@ -10,10 +10,10 @@ import cogs.embeds.Mafia.Reaper
 import cogs.embeds.File_embeds.embeds as File_embeds
 
 
-def get_current_gamemode(bot):
-    cog = bot.get_cog('Gamemodes')
-    if cog is not None:
-        return cog.current_gamemode # gets current gamemode
+# def get_current_gamemode(bot):
+#     cog = bot.get_cog('Gamemodes')
+#     if cog is not None:
+#         return cog.current_gamemode # gets current gamemode
 
 
 class Join(commands.Cog):
@@ -82,12 +82,7 @@ class Join(commands.Cog):
     @commands.hybrid_command(name="queue", description = "See the current queue for the mafia party")
     async def Queue_Command(self, ctx):
         #print(Gamemodes.get_gamemode())
-        print(get_current_gamemode(self.bot))
-        #print(get_current_gamemode())
-        #print(Gamemodes.get_current_gamemode())
-        #print(gamemodes_instance.current_gamemode[0])
-        #print(gamemodes_instance.get_current_gamemode())
-        #print(gamemodes_instance.set_current_gamemode(gamemodes_instance.current_gamemode[0]))
+        #print(get_current_gamemode(self.bot)) # changed how this works
 
         async def display_Join_Queue_Mentions():
             if not Join.join_queue:
@@ -162,6 +157,7 @@ class Join(commands.Cog):
 
     @commands.hybrid_command(name="party", description = "See who's in the party!")
     async def Party_command(self, ctx):
+        guild = ctx.guild
         async def display_Players():
             if not Join.players[0] or not Join.players[1]:
                 return "N/A"
@@ -170,7 +166,7 @@ class Join(commands.Cog):
             
         async def display_Gamemodes():
             gamemodes = Gamemodes.Mafia_gamemodes() 
-            return "\n".join([f"`{gamemode}` {'✅' if gamemode == get_current_gamemode(self.bot) else ''}" for gamemode in gamemodes])
+            return "\n".join([f"`{gamemode}` {'✅' if gamemode == self.bot.get_cog('Gamemodes').get_current_gamemode(guild.id) else ''}" for gamemode in gamemodes])
 
 
         partyEmbed = discord.Embed(
