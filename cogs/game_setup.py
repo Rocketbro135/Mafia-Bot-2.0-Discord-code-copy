@@ -16,11 +16,19 @@ class GameSetup(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.setups_done = {}
-        self.player_list = dict(zip(Join.players[0], Join.players[1]))
+        self.player_list = {}
+
+    async def initialize_player_list(self): # add an except error later where a message shows if a user tries to setup a game before joining in the guild
+        join_cog = self.bot.get_cog('Join')
+        if join_cog:
+            print(join_cog.players)
+            player_data = list(join_cog.players.values())[0]
+            self.player_list = dict(zip(player_data['names'], player_data['ids']))
 
     async def create_mafia_game_channel(self, ctx, role_name, category_id):
         guild = ctx.guild
-        join_cog = self.bot.get_cog('Join')
+        await self.initialize_player_list()
+        #join_cog = self.bot.get_cog('Join')
         category = guild.get_channel(category_id)
         spectator_role = await self.get_or_create_role(guild, role_name)
 
@@ -35,8 +43,9 @@ class GameSetup(commands.Cog):
         }
 
         # Gets the players currently Joined and puts their id's in joined_player_ids
-        joined_player_ids = [guild.get_member(player_id) for player_id in join_cog.players[1] if guild.get_member(player_id) is not None]
-    
+        #joined_player_ids = [guild.get_member(player_id) for player_id in join_cog.players[1] if guild.get_member(player_id) is not None]
+        joined_player_ids = [guild.get_member(player_id) for player_id in self.player_list.values() if guild.get_member(player_id) is not None]
+
         for joined_player in joined_player_ids:
             overwrites[joined_player] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
 
@@ -111,7 +120,6 @@ class GameSetup(commands.Cog):
                 category_id = ctx.channel.category_id
             
             print(category_id)
-            print("test")
 
             # Create the channels in the specified category, or in the guild if no category is specified
             if category_id:
@@ -135,8 +143,12 @@ class GameSetup(commands.Cog):
 
             print(spectator_role) # prints out Mafia spectator
             print(self.setups_done)
+
+
+            # developing the random generation of roles that players will get in mafia
             
-            # develop code so that it requires a gamemode to be set
+            # develop code so that it requires a gamemode to be set (done)
+
             #await ctx.send("Press the button to join as spectator!", view=self.SpectatorView(spectator_role, self)) 
             # move the above to the future /start command as I want the spectator button shown then and as a ctx.send (done)
             await ctx.send(embed=File_embeds.setup_game_embed)
@@ -144,13 +156,13 @@ class GameSetup(commands.Cog):
     @commands.hybrid_command(name="start", description = "Start the mafia game with all current party members!") # reminder to move config channel command to other file
     async def start_game_command(self, ctx):
         guild_id = ctx.guild.id
-        gamemode = self.bot.get_cog('Gamemodes').get_current_gamemode(guild.id)
+        gamemode = self.bot.get_cog('Gamemodes').get_current_gamemode(guild_id)
 
         # Check if the setup has been done
         if guild_id in self.setups_done:
             # Check if the user is the party leader
             join_cog = self.bot.get_cog('Join')
-            if join_cog and join_cog.players[1] and ctx.author.id == join_cog.players[1][0]:
+            if join_cog and join_cog.players[guild_id]['ids'] and ctx.author.id == join_cog.players[guild_id]['ids'][0]:
                 spectator_role = self.setups_done[guild_id]['spectator_role']
                 await ctx.send("Press the button to join as spectator!", view=self.SpectatorView(spectator_role, self))
 
@@ -158,8 +170,8 @@ class GameSetup(commands.Cog):
                 guild = ctx.guild
                 mafia_game_channel = discord.utils.get(guild.text_channels, id=self.setups_done[guild.id]['mafia_game_channel'].id)
                 if mafia_game_channel:
-                    print(join_cog.players[1])
-                    players_mention = " ".join([f"<@{player}>" for player in join_cog.players[1]])
+                    print(join_cog.players[guild_id]['ids'])
+                    players_mention = " ".join([f"<@{player}>" for player in join_cog.players[guild_id]['ids']])
                     await mafia_game_channel.send(f"{players_mention}") # mafia_game_channel.send(f"Attention all players: {players_mention}, the game is about to start!")
                     await mafia_game_channel.send(embed=File_embeds.welcome_to_mafia_embed)
                     await asyncio.sleep(3) # Wait before sending the next embed
@@ -184,25 +196,27 @@ class GameSetup(commands.Cog):
     @commands.hybrid_command(name="spectator", description = "Assigns spectator so you can watch Mafia 2.0 Games!")
     async def become_spectator(self, ctx):
         guild_id = ctx.guild.id
+        join_cog = self.bot.get_cog('Join')
+
         if guild_id in self.setups_done:
             member = ctx.guild.get_member(ctx.author.id)
+
             if member is None:
                 await ctx.send('You are not a member!')
                 return
-            players_class = self.bot.get_cog('Join')
-            player_ids = players_class.players[1] if players_class else []
-
-            if member.id not in player_ids:
-                spectator_role = self.setups_done[guild_id]['spectator_role']
-                print(self.setups_done[guild_id])
-                print(spectator_role)
-                if spectator_role is None:
-                    await ctx.send('No spectator role found!')
-                    return
-                await member.add_roles(spectator_role) 
-                await ctx.send("You are now a spectator!")
-            else:
+            
+            if join_cog and member.id in join_cog.players[guild_id]['ids']:
                 await ctx.send('You are already a player!')
+                return
+            
+            spectator_role = self.setups_done[guild_id]['spectator_role']
+        
+            if spectator_role is None:
+                await ctx.send('No spectator role found!')
+                return
+        
+            await member.add_roles(spectator_role)
+            await ctx.send("You are now a spectator!")
         else:
             await ctx.send('Setup has not been run for this guild!')
                 
@@ -210,4 +224,3 @@ class GameSetup(commands.Cog):
 async def setup(bot):
     cog = GameSetup(bot)
     await bot.add_cog(cog)
-
