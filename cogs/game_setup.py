@@ -1,16 +1,27 @@
 import asyncio
+import random
 import discord
 from discord.ext import commands
 
-from cogs.initialization import Join
+# File imports
+#from cogs.initialization import Join
 import cogs.embeds.File_embeds.embeds as File_embeds
-#from cogs.config import Gamemodes
+from cogs.mafiaLogic import GameLogic
 
-# def get_current_gamemode(bot):
-#     cog = bot.get_cog('Gamemodes')
-#     if cog is not None:
-#         return cog.current_gamemode # gets current gamemode
-
+import cogs.embeds.Mafia.Mafia
+import cogs.embeds.Mafia.Godfather
+import cogs.embeds.Mafia.Framer
+import cogs.embeds.Villager.Doctor
+import cogs.embeds.Villager.Detective
+import cogs.embeds.Villager.Villager
+import cogs.embeds.Villager.Vigilante
+import cogs.embeds.Villager.Mayor
+import cogs.embeds.Villager.PI
+import cogs.embeds.Villager.Spy
+import cogs.embeds.Villager.Distractor
+import cogs.embeds.Neutral.Executioner
+import cogs.embeds.Neutral.Jester
+import cogs.embeds.Neutral.Baiter
 
 class GameSetup(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -18,16 +29,196 @@ class GameSetup(commands.Cog):
         self.setups_done = {}
         self.player_list = {}
 
-    async def initialize_player_list(self): # add an except error later where a message shows if a user tries to setup a game before joining in the guild
+    async def initialize_player_list(self, guild_id): # add an except error later where a message shows if a user tries to setup a game before joining in the guild
         join_cog = self.bot.get_cog('Join')
-        if join_cog:
-            print(join_cog.players)
-            player_data = list(join_cog.players.values())[0]
+        if join_cog and guild_id in join_cog.players: # ensures that it checks the guild_id in the dictionary
+            player_data = join_cog.players[guild_id]
             self.player_list = dict(zip(player_data['names'], player_data['ids']))
+            print(self.player_list)
+            
+    async def mafia_role_selection(self, ctx):
+        await ctx.defer()
+        guild = ctx.guild
+        gamemode = self.bot.get_cog('Gamemodes').get_current_gamemode(guild.id)
+        
+        def role_selector(gamemode, player_count):
+            if gamemode == 'Classic':
+                def classic_roles(player_count):
+                    #mafia_count = 1 if player_count < 6 else 2  # 1 mafia for less than 6 players, 2 for 6 or more
+                    if player_count < 6:
+                        mafia_count = 1
+                    else:
+                        mafia_count = 2
+
+                    mafia_roles = ['Mafia', 'Godfather'][:mafia_count] # 1 is just mafia, 2 is mafia and godfather
+                    
+                    unique_roles = ['Doctor', 'Detective']
+                    villager_count = player_count - len(mafia_roles) - len(unique_roles)
+                    villager_roles = ['Villager'] * villager_count
+                    
+                    roles = mafia_roles + unique_roles + villager_roles
+                    random.shuffle(roles)
+                    return roles
+            
+                return classic_roles(player_count)
+            
+            elif gamemode == 'Crazy':
+                def crazy_roles(player_count):
+                    # Add the default roles
+                    default_roles = ['Godfather', 'Mafia', 'Doctor', 'Detective']
+
+                    # Add default mafia roles
+                    default_mafia_roles = ['Godfather, Mafia', 'Framer']
+
+                    # Add the unique roles for the Crazy gamemode
+                    unique_roles = ['Vigilante', 'Mayor', 'Executioner', 'Jester']
+
+                    # Add the Mafia roles
+                    mafia_roles = ['Framer']
+
+                    # Calculate the number of Villager roles needed
+                    villager_count = player_count - len(default_roles) - len(unique_roles) - len(mafia_roles)
+
+                    # Create a list of Villager roles
+                    villager_roles = ['Villager'] * villager_count
+
+                    # Combine all the roles and shuffle them
+                    roles = default_roles + unique_roles + villager_roles + mafia_roles
+                    random.shuffle(roles)
+                    return roles
+                   
+                return crazy_roles(player_count)
+
+            elif gamemode == 'Chaos':
+                def chaos_roles(player_count):
+                    # Add the default roles
+                    default_roles = ['Godfather', 'Mafia', 'Doctor', 'Detective']
+
+                    # Add the unique roles for the Chaos gamemode
+                    unique_roles = ['PI', 'Spy', 'Distractor', 'Jester']
+
+                    # Add the Neutral roles
+                    mafia_roles = ['Baiter', 'Bomber']
+
+                    # Calculate the number of Villager roles needed
+                    villager_count = player_count - len(default_roles) - len(unique_roles) - len(mafia_roles)
+
+                    # Create a list of Villager roles
+                    villager_roles = ['Villager'] * villager_count
+
+                    # Combine all the roles and shuffle them
+                    roles = default_roles + unique_roles + villager_roles + mafia_roles
+                    random.shuffle(roles)
+                    return roles
+                
+                return chaos_roles(player_count)
+
+                #  Add other gamemodes here later
+
+        if gamemode == 'Classic':
+            player_count = len(self.player_list)
+            roles = role_selector(gamemode, player_count)
+            random.shuffle(roles)
+
+            role_dict = {}  # Dictionary to store player roles
+
+            for player, role in zip(self.player_list.keys(), roles):
+                role_name = f'{role} ({player})'
+                role_dict[player] = role_name
+                user_id = self.player_list[player]
+                async def check_role(user, role):
+                    if role == 'Mafia':
+                        await user.send(embed=cogs.embeds.Mafia.Mafia.mafia_role)
+                    elif role == 'Godfather':
+                        await user.send(embed=cogs.embeds.Mafia.Godfather.godfather_role)
+                    elif role == 'Doctor':
+                        await user.send(embed=cogs.embeds.Villager.Doctor.doctor_role)
+                    elif role == 'Detective':
+                        await user.send(embed=cogs.embeds.Villager.Detective.detective_role)
+                    elif role == 'Villager':
+                        await user.send(embed=cogs.embeds.Villager.Villager.villager_role)  
+
+                user = await self.bot.fetch_user(user_id)
+                await check_role(user, role)
+                print(role_name) #testing
+
+            await ctx.send("Mafia game roles have been assigned!")
+
+        elif gamemode == 'Crazy':
+            player_count = len(self.player_list)
+            roles = role_selector(gamemode,player_count)
+            random.shuffle(roles)
+
+            role_dict = {}
+
+            for player, role in zip(self.player_list.keys(), roles):
+                role_name = f'{role} ({player})'
+                role_dict[player] = role_name
+                user_id = self.player_list[player]
+                async def check_role(user, role):
+                    if role == 'Mafia':
+                        await user.send(embed=cogs.embeds.Mafia.Mafia.mafia_role)
+                    elif role == 'Godfather':
+                        await user.send(embed=cogs.embeds.Mafia.Godfather.godfather_role)
+                    elif role == 'Doctor':
+                        await user.send(embed=cogs.embeds.Villager.Doctor.doctor_role)
+                    elif role == 'Detective':
+                        await user.send(embed=cogs.embeds.Villager.Detective.detective_role)
+                    elif role == 'Villager':
+                        await user.send(embed=cogs.embeds.Villager.Villager.villager_role)
+                    elif role == 'Vigilante':
+                        await user.send(embed=cogs.embeds.Villager.Vigilante.vigilante_role)
+                    elif role == 'Mayor':
+                        await user.send(embed=cogs.embeds.Villager.Mayor.mayor_role)
+                    elif role == 'Framer':
+                        await user.send(embed=cogs.embeds.Mafia.Framer.framer_role)
+                    elif role == 'Executioner':
+                        await user.send(embed=cogs.embeds.Neutral.Executioner.executioner_role)
+                    elif role == 'Jester':
+                        await user.send(embed=cogs.embeds.Neutral.Jester.jester_role)
+
+                user = await self.bot.fetch_user(user_id)
+                await check_role(user, role)
+                print(role_name) #testing
+
+        elif gamemode == 'Chaos':
+            player_count = len(self.player_list)
+            roles = role_selector(gamemode,player_count)
+            random.shuffle(roles)
+
+            role_dict = {}
+
+            for player, role in zip(self.player_list.keys(), roles):
+                role_name = f'{role} ({player})'
+                role_dict[player] = role_name
+                user_id = self.player_list[player]
+                async def check_role(user, role):
+                    if role == 'Mafia':
+                        await user.send(embed=cogs.embeds.Mafia.Mafia.mafia_role)
+                    elif role == 'Godfather':
+                        await user.send(embed=cogs.embeds.Mafia.Godfather.godfather_role)
+                    elif role == 'Doctor':
+                        await user.send(embed=cogs.embeds.Villager.Doctor.doctor_role)
+                    elif role == 'Detective':
+                        await user.send(embed=cogs.embeds.Villager.Detective.detective_role)
+                    elif role == 'Villager':
+                        await user.send(embed=cogs.embeds.Villager.Villager.villager_role)
+                    elif role == 'PI':
+                        await user.send(embed=cogs.embeds.Villager.PI.pi_role)
+                    elif role == 'Spy':
+                        await user.send(embed=cogs.embeds.Villager.Spy.spy_role)
+                    elif role == 'Distractor':
+                        await user.send(embed=cogs.embeds.Villager.Distractor.distractor_role)
+                    elif role == 'Baiter':
+                        await user.send(embed=cogs.embeds.Neutral.Baiter.baiter_role)
+
+                user = await self.bot.fetch_user(user_id)
+                await check_role(user, role)
+                print(role_name) #testing
 
     async def create_mafia_game_channel(self, ctx, role_name, category_id):
         guild = ctx.guild
-        await self.initialize_player_list()
+        await self.initialize_player_list(guild_id=guild.id)
         #join_cog = self.bot.get_cog('Join')
         category = guild.get_channel(category_id)
         spectator_role = await self.get_or_create_role(guild, role_name)
@@ -43,9 +234,9 @@ class GameSetup(commands.Cog):
         }
 
         # Gets the players currently Joined and puts their id's in joined_player_ids
-        #joined_player_ids = [guild.get_member(player_id) for player_id in join_cog.players[1] if guild.get_member(player_id) is not None]
         joined_player_ids = [guild.get_member(player_id) for player_id in self.player_list.values() if guild.get_member(player_id) is not None]
 
+        # Gives the joined players permission to see and read the channel but they can't type messages
         for joined_player in joined_player_ids:
             overwrites[joined_player] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
 
@@ -105,6 +296,7 @@ class GameSetup(commands.Cog):
         guild = ctx.guild
         gamemode = self.bot.get_cog('Gamemodes').get_current_gamemode(guild.id)
 
+        #include player requirement statement here later
         if gamemode == None:
             await ctx.send("Please select a gamemode with /gamemode")
         else:
@@ -136,17 +328,21 @@ class GameSetup(commands.Cog):
 
             self.setups_done[guild.id] = {
                 'spectator_channel': spectator_channel,
-                'spectator_role': spectator_role,
+                'spectator_role': spectator_role, # name of the spectator role
                 'mafia_role_thread': mafia_role_thread,
                 'mafia_game_channel': mafia_game_channel
             }
-
-            print(spectator_role) # prints out Mafia spectator
+            print(self.setups_done[guild.id]['mafia_game_channel'].id)
+            print("=====")
             print(self.setups_done)
+            print(self.player_list)
+
+            await self.mafia_role_selection(ctx)
+            print(self.player_list.values())
 
 
-            # developing the random generation of roles that players will get in mafia
-            
+
+            # develop code so that setup can only be ran once per game
             # develop code so that it requires a gamemode to be set (done)
 
             #await ctx.send("Press the button to join as spectator!", view=self.SpectatorView(spectator_role, self)) 
@@ -155,7 +351,9 @@ class GameSetup(commands.Cog):
     
     @commands.hybrid_command(name="start", description = "Start the mafia game with all current party members!") # reminder to move config channel command to other file
     async def start_game_command(self, ctx):
+        guild = ctx.guild
         guild_id = ctx.guild.id
+        category_id = self.setups_done[guild.id]['mafia_game_channel'].id
         gamemode = self.bot.get_cog('Gamemodes').get_current_gamemode(guild_id)
 
         # Check if the setup has been done
@@ -186,12 +384,18 @@ class GameSetup(commands.Cog):
                     description=f"Please wait. Setting game with mode: {gamemode}",
                     color=discord.Color.red()
                 )
-
+                
                 await ctx.send(embed=start_game_embed_Success)  # make sure to add the other embed for starting the game
+
+                await GameLogic.playertextPerms(self, ctx, category_id)
+
+                await GameLogic.talktimetimerLogic(self, ctx, guild_id, category_id)
+
             else:
                 await ctx.send('You are not the party leader!')
         else:
             await ctx.send('Setup has not been run for this guild!')
+        
 
     @commands.hybrid_command(name="spectator", description = "Assigns spectator so you can watch Mafia 2.0 Games!")
     async def become_spectator(self, ctx):
@@ -219,8 +423,8 @@ class GameSetup(commands.Cog):
             await ctx.send("You are now a spectator!")
         else:
             await ctx.send('Setup has not been run for this guild!')
-                
 
 async def setup(bot):
     cog = GameSetup(bot)
     await bot.add_cog(cog)
+
